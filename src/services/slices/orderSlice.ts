@@ -4,7 +4,7 @@ import { clearConstructor } from './constructorSlice';
 import { TOrder } from '../../utils/types';
 
 type TOrderState = {
-  orderData: any | null;
+  orderData: TOrder | null;
   orderRequest: boolean;
   userOrders: TOrder[];
   isLoadingOrders: boolean;
@@ -24,7 +24,18 @@ export const createOrder = createAsyncThunk(
   async (ingredientIds: string[], { dispatch }) => {
     const data = await orderBurgerApi(ingredientIds);
     dispatch(clearConstructor());
-    return data.order;
+
+    // Безопасное дополнение объекта заказа до типа TOrder,
+    // чтобы удовлетворить компилятор TypeScript и не ломать компоненты
+    return {
+      ...data.order,
+      _id: data.order._id || '',
+      status: data.order.status || 'done',
+      name: data.order.name || 'Stellar Burger',
+      createdAt: data.order.createdAt || new Date().toISOString(),
+      updatedAt: data.order.updatedAt || new Date().toISOString(),
+      ingredients: ingredientIds // Подставляем отправленные id, так как их нет в TNewOrder
+    } as TOrder;
   }
 );
 
@@ -52,10 +63,10 @@ const orderSlice = createSlice({
       })
       .addCase(createOrder.fulfilled, (state, action) => {
         state.orderRequest = false;
-        state.orderData = action.payload;
+        state.orderData = action.payload; // Теперь типы на 100% совпадают
       })
       .addCase(createOrder.rejected, (state, action) => {
-        state.orderRequest = false;
+        state.orderRequest = false; // Обязательно выключаем лоудер при ошибке!
         state.error = action.error.message;
       })
       .addCase(fetchUserOrders.pending, (state) => {

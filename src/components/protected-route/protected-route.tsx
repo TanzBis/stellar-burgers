@@ -20,12 +20,16 @@ export const ProtectedRoute = ({
     return <Preloader />;
   }
 
+  // Если маршрут только для неавторизованных (Login, Register), но юзер УЖЕ вошел
   if (onlyUnAuth && user) {
-    const from = location.state?.from?.pathname || '/';
+    // Берем весь сохраненный объект location из state, либо отправляем на главную
+    const from = location.state?.from || { pathname: '/' };
     return <Navigate to={from} replace />;
   }
 
+  // Если маршрут защищенный (Profile), но юзер ЕЩЕ НЕ вошел
   if (!onlyUnAuth && !user) {
+    // Сохраняем ТЕКУЩИЙ маршрут в state, чтобы вернуться на него после логина
     return <Navigate to='/login' state={{ from: location }} replace />;
   }
 

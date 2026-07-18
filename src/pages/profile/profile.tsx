@@ -13,12 +13,14 @@ export const Profile: FC = () => {
     password: ''
   });
 
+  // Синхронизируем форму с актуальными данными пользователя из стора
+  // При успешном апдейте или отмене принудительно сбрасываем и пароль тоже
   useEffect(() => {
-    setFormValue((prevState) => ({
-      ...prevState,
+    setFormValue({
       name: user?.name || '',
-      email: user?.email || ''
-    }));
+      email: user?.email || '',
+      password: ''
+    });
   }, [user]);
 
   const isFormChanged =
@@ -28,7 +30,20 @@ export const Profile: FC = () => {
 
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault();
-    dispatch(updateUser(formValue));
+
+    // Если поле пароля пустое, исключаем его из запроса к API по ТЗ
+    const fieldsToUpdate = {
+      name: formValue.name,
+      email: formValue.email,
+      ...(formValue.password ? { password: formValue.password } : {})
+    };
+
+    dispatch(updateUser(fieldsToUpdate))
+      .unwrap()
+      .then(() => {
+        setFormValue((prev) => ({ ...prev, password: '' }));
+      })
+      .catch((err) => console.error(err));
   };
 
   const handleCancel = (e: SyntheticEvent) => {

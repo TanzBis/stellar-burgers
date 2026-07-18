@@ -1,13 +1,10 @@
 import { FC, SyntheticEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { RegisterUI } from '@ui-pages';
 import { useDispatch, useSelector } from '../../services/store';
 import { registerUser, getUserState } from '../../services/slices/userSlice';
 
 export const Register: FC = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-
   const { error } = useSelector(getUserState);
 
   const [userName, setUserName] = useState('');
@@ -18,14 +15,10 @@ export const Register: FC = () => {
     e.preventDefault();
     if (!userName || !email || !password) return;
 
-    dispatch(registerUser({ name: userName, email, password }))
-      .unwrap()
-      .then(() => {
-        navigate('/', { replace: true });
-      })
-      .catch((err) => {
-        console.error(err);
-      });
+    // Убрали ручной навигатор из .then(), ликвидировав гонку редиректов по чеклисту
+    dispatch(registerUser({ name: userName, email, password })).catch((err) =>
+      console.error(err)
+    );
   };
 
   return (

@@ -4,9 +4,12 @@ import {
   logoutApi,
   getUserApi,
   registerUserApi,
-  updateUserApi
+  updateUserApi,
+  TRegisterData,
+  TLoginData
 } from '../../utils/burger-api';
 import { TUser } from '../../utils/types';
+import { setCookie, deleteCookie } from '../../utils/cookie';
 
 type TUserState = {
   user: TUser | null;
@@ -25,13 +28,13 @@ const initialState: TUserState = {
 export const checkUserAuth = createAsyncThunk(
   'user/checkUserAuth',
   async (_, { dispatch }) => {
-    if (localStorage.getItem('accessToken')) {
+    if (localStorage.getItem('refreshToken')) {
       try {
         const data = await getUserApi();
         return data.user;
       } catch (error) {
-        localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        deleteCookie('accessToken');
         throw error;
       }
     }
@@ -39,21 +42,23 @@ export const checkUserAuth = createAsyncThunk(
   }
 );
 
+// Заменили any на TRegisterData
 export const registerUser = createAsyncThunk(
   'user/registerUser',
-  async (registerData: any) => {
+  async (registerData: TRegisterData) => {
     const data = await registerUserApi(registerData);
-    localStorage.setItem('accessToken', data.accessToken);
+    setCookie('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
     return data.user;
   }
 );
 
+// Заменили any на TLoginData
 export const loginUser = createAsyncThunk(
   'user/loginUser',
-  async (loginData: any) => {
+  async (loginData: TLoginData) => {
     const data = await loginUserApi(loginData);
-    localStorage.setItem('accessToken', data.accessToken);
+    setCookie('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
     return data.user;
   }
@@ -61,13 +66,14 @@ export const loginUser = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk('user/logoutUser', async () => {
   await logoutApi();
-  localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
+  deleteCookie('accessToken');
 });
 
+// Заменили any на Partial<TRegisterData> (так как обновлять можно имя, email или пароль вместе/по отдельности)
 export const updateUser = createAsyncThunk(
   'user/updateUser',
-  async (userData: any) => {
+  async (userData: Partial<TRegisterData>) => {
     const data = await updateUserApi(userData);
     return data.user;
   }
