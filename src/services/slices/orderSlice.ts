@@ -1,5 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { orderBurgerApi, getOrdersApi } from '../../utils/burger-api';
+import {
+  orderBurgerApi,
+  getOrdersApi,
+  getOrderByNumberApi
+} from '../../utils/burger-api';
 import { clearConstructor } from './constructorSlice';
 import { TOrder } from '../../utils/types';
 
@@ -8,6 +12,7 @@ type TOrderState = {
   orderRequest: boolean;
   userOrders: TOrder[];
   isLoadingOrders: boolean;
+  orderByNumber: TOrder | null;
   error: string | null | undefined;
 };
 
@@ -16,6 +21,7 @@ const initialState: TOrderState = {
   orderRequest: false,
   userOrders: [],
   isLoadingOrders: false,
+  orderByNumber: null,
   error: null
 };
 
@@ -25,8 +31,6 @@ export const createOrder = createAsyncThunk(
     const data = await orderBurgerApi(ingredientIds);
     dispatch(clearConstructor());
 
-    // Безопасное дополнение объекта заказа до типа TOrder,
-    // чтобы удовлетворить компилятор TypeScript и не ломать компоненты
     return {
       ...data.order,
       _id: data.order._id || '',
@@ -34,7 +38,7 @@ export const createOrder = createAsyncThunk(
       name: data.order.name || 'Stellar Burger',
       createdAt: data.order.createdAt || new Date().toISOString(),
       updatedAt: data.order.updatedAt || new Date().toISOString(),
-      ingredients: ingredientIds // Подставляем отправленные id, так как их нет в TNewOrder
+      ingredients: ingredientIds
     } as TOrder;
   }
 );
@@ -47,12 +51,23 @@ export const fetchUserOrders = createAsyncThunk(
   }
 );
 
+export const fetchOrderByNumber = createAsyncThunk(
+  'order/fetchOrderByNumber',
+  async (number: number) => {
+    const data = await getOrderByNumberApi(number);
+    return data.orders && data.orders.length > 0 ? data.orders[0] : null;
+  }
+);
+
 const orderSlice = createSlice({
   name: 'order',
   initialState,
   reducers: {
     clearOrderData: (state) => {
       state.orderData = null;
+    },
+    clearOrderByNumber: (state) => {
+      state.orderByNumber = null;
     }
   },
   extraReducers: (builder) => {
@@ -63,10 +78,10 @@ const orderSlice = createSlice({
       })
       .addCase(createOrder.fulfilled, (state, action) => {
         state.orderRequest = false;
-        state.orderData = action.payload; // Теперь типы на 100% совпадают
+        state.orderData = action.payload;
       })
       .addCase(createOrder.rejected, (state, action) => {
-        state.orderRequest = false; // Обязательно выключаем лоудер при ошибке!
+        state.orderRequest = false;
         state.error = action.error.message;
       })
       .addCase(fetchUserOrders.pending, (state) => {
@@ -80,11 +95,20 @@ const orderSlice = createSlice({
       .addCase(fetchUserOrders.rejected, (state, action) => {
         state.isLoadingOrders = false;
         state.error = action.error.message;
+      })
+      .addCase(fetchOrderByNumber.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(fetchOrderByNumber.fulfilled, (state, action) => {
+        state.orderByNumber = action.payload;
+      })
+      .addCase(fetchOrderByNumber.rejected, (state, action) => {
+        state.error = action.error.message;
       });
   }
 });
 
-export const { clearOrderData } = orderSlice.actions;
+export const { clearOrderData, clearOrderByNumber } = orderSlice.actions;
 
 export const getOrderState = (state: { order: TOrderState }) => state.order;
 
