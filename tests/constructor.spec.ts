@@ -130,7 +130,7 @@ test.describe('Конструктор бургеров', () => {
       page.locator('section').filter({ hasText: 'Выберите булки' })
     ).toBeVisible();
 
-    // Закрытие модального окна
+    // Закрытие модального окн
     const closeButton = page
       .locator('#modals button, [class*="close"]')
       .first();
