@@ -1,15 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Конструктор бургеров', () => {
-  test.beforeEach(async ({ page, context }) => {
-    // 1. Ингредиенты берем из HAR-файла
+  test.beforeEach(async ({ page }) => {
     await page.routeFromHAR('tests/hars/ingredients.har', {
       url: '**/api/ingredients',
       update: false
     });
 
-    // 2. Жестко возвращаем успешный профиль пользователя,
-    // чтобы приложение со старта знало, что мы авторизованы
     await page.route('**/api/auth/user', async (route) => {
       await route.fulfill({
         status: 200,
@@ -24,7 +21,6 @@ test.describe('Конструктор бургеров', () => {
       });
     });
 
-    // 3. Жестко возвращаем ваш номер заказа 109008
     await page.route('**/api/orders', async (route) => {
       await route.fulfill({
         status: 200,
@@ -90,14 +86,12 @@ test.describe('Конструктор бургеров', () => {
   });
 
   test('Создание заказа', async ({ page, context }) => {
-    // Внедряем токены в localStorage ПЕРЕД переходом на сайт.
-    // Этот скрипт сработает железно в момент инициализации страницы.
+    // Авторизация перед загрузкой страницы
     await context.addInitScript(() => {
       window.localStorage.setItem('accessToken', 'Bearer mock_access_token');
       window.localStorage.setItem('refreshToken', 'mock_refresh_token');
     });
 
-    // Добавляем куки
     await context.addCookies([
       {
         name: 'accessToken',
@@ -107,11 +101,10 @@ test.describe('Конструктор бургеров', () => {
       }
     ]);
 
-    // Теперь спокойно переходим на главную
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Собираем бургер
+    // Сборка бургера
     await page
       .locator('li')
       .filter({ hasText: 'булка' })
@@ -126,20 +119,18 @@ test.describe('Конструктор бургеров', () => {
       .getByRole('button', { name: 'Добавить' })
       .click();
 
-    // Кликаем по кнопке оформления заказа
     const orderButton = page.getByRole('button', { name: 'Оформить заказ' });
     await orderButton.click();
 
-    // 1. Проверяем появление номера заказа на экране
+    // Проверка создания заказа и очистки конструктора
     const orderModalText = page.getByText('109008');
     await expect(orderModalText).toBeVisible({ timeout: 10000 });
 
-    // 2. Проверяем, что конструктор бургера полностью очистился после успешного заказа
     await expect(
       page.locator('section').filter({ hasText: 'Выберите булки' })
     ).toBeVisible();
 
-    // 3. Находим кнопку закрытия (крестик) внутри модалки портала и кликаем
+    // Закрытие модального окна
     const closeButton = page
       .locator('#modals button, [class*="close"]')
       .first();
