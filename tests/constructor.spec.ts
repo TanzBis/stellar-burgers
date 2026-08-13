@@ -1,140 +1,140 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Конструктор бургеров', () => {
+const HAR_PATH = 'tests/hars/app.har';
+const API_URL = 'https://norma.education-services.ru/api';
+
+test.describe('Конструктор бургера', () => {
   test.beforeEach(async ({ page }) => {
-    await page.routeFromHAR('tests/hars/ingredients.har', {
-      url: '**/api/ingredients',
-      update: false
-    });
-
-    await page.route('**/api/auth/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          user: {
-            email: 'test@test.ru',
-            name: 'Tanzila'
-          }
-        })
-      });
-    });
-
-    await page.route('**/api/orders', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          name: 'Краторный био-бургер',
-          order: {
-            number: 109008
-          }
-        })
-      });
+    await page.routeFromHAR(HAR_PATH, {
+      url: `${API_URL}/**`,
+      notFound: 'abort'
     });
   });
 
-  test('Добавление ingredientа в констурктор', async ({ page }) => {
+  test('главная страница открывается', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const bunCard = page.locator('li').filter({ hasText: 'булка' }).first();
-    await bunCard.getByRole('button', { name: 'Добавить' }).click();
-
-    const toppingCard = page
-      .locator('li')
-      .filter({ hasNotText: 'булка' })
-      .first();
-    await toppingCard.getByRole('button', { name: 'Добавить' }).click();
 
     await expect(
-      page.locator('section').filter({ hasText: 'Выберите булки' })
-    ).not.toBeVisible();
+      page.getByRole('heading', {
+        name: 'Соберите бургер'
+      })
+    ).toBeVisible();
   });
 
-  test('Работа модального окна ингредиента', async ({ page }) => {
+  test('можно добавить булку и начинку в конструктор', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
-    const firstIngredient = page.locator('li').first();
-    const ingredientNameText = await firstIngredient
-      .locator('p')
-      .first()
-      .innerText();
+    const constructor = page.getByTestId('burger-constructor');
 
-    await firstIngredient.locator('p').first().click();
+    // Кликаем по Краторной булке
+    const bunCard = page.getByTestId('ingredient-643d69a5c3f7b9001cfa093c');
+    await bunCard.locator('button', { hasText: 'Добавить' }).click();
 
-    await expect(page.getByText(ingredientNameText).first()).toBeVisible();
+    // Кликаем по твоей Биокотлете из марсианской Магнолии
+    const sauceCard = page.getByTestId('ingredient-643d69a5c3f7b9001cfa0941');
+    await sauceCard.locator('button', { hasText: 'Добавить' }).click();
 
-    const closeButton = page
-      .locator(
-        '[class^="modal_modal"] button, button[class*="close"], #modals button'
-      )
-      .first();
-
-    if (await closeButton.isVisible()) {
-      await closeButton.click();
-      await expect(closeButton).not.toBeVisible();
-    } else {
-      await page.goBack();
-      await expect(
-        page.locator('section').filter({ hasText: 'Конструктор' })
-      ).toBeVisible();
-    }
+    // Проверяем элементы в конструкторе (Булки и твою Биокотлету)
+    await expect(constructor.getByText(/Краторная булка.*верх/i)).toBeVisible();
+    await expect(constructor.getByText(/Краторная булка.*низ/i)).toBeVisible();
+    await expect(
+      constructor.getByText(/Биокотлета из марсианской Магнолии/i)
+    ).toBeVisible();
   });
 
-  test('Создание заказа', async ({ page, context }) => {
-    // Авторизация перед загрузкой страницы
-    await context.addInitScript(() => {
-      window.localStorage.setItem('accessToken', 'Bearer mock_access_token');
-      window.localStorage.setItem('refreshToken', 'mock_refresh_token');
-    });
+  test('открывается и закрывается модальное окно ингредиента по крестику', async ({
+    page
+  }) => {
+    await page.goto('/');
 
-    await context.addCookies([
+    const bunCard = page.getByTestId('ingredient-643d69a5c3f7b9001cfa093c');
+
+    await bunCard.getByRole('link').click();
+
+    const modal = page.locator('#modals');
+
+    await expect(
+      modal.getByRole('heading', {
+        name: 'Детали ингредиента'
+      })
+    ).toBeVisible();
+
+    await expect(
+      modal.getByRole('heading', {
+        name: 'Краторная булка N-200i'
+      })
+    ).toBeVisible();
+
+    await page.locator('#modals button').click();
+
+    await expect(
+      modal.getByRole('heading', {
+        name: 'Детали ингредиента'
+      })
+    ).toHaveCount(0);
+  });
+
+  test('можно оформить заказ', async ({ page }) => {
+    await page.context().addCookies([
       {
         name: 'accessToken',
-        value: 'Bearer mock_access_token',
+        value:
+          'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhN2NhMzRiNmExNzJkMDAxYjk5MjRlNCIsImlhdCI6MTc4NjYzNTA2MSwiZXhwIjoxNzg2NjM2MjYxfQ.uOJI0qRUVHGiiOrvl3bRvyoQlWX_NiiIBnQbvB96za0',
         domain: 'localhost',
         path: '/'
       }
     ]);
 
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'refreshToken',
+        '6909fd1ea05d625c9523fe743337f52bf45dbae76ad20feb195bd33abeacdc1f2d82c045b9ab2d91'
+      );
+    });
+
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
-    // Сборка бургера
-    await page
-      .locator('li')
-      .filter({ hasText: 'булка' })
-      .first()
-      .getByRole('button', { name: 'Добавить' })
-      .click();
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'refreshToken',
+        '6909fd1ea05d625c9523fe743337f52bf45dbae76ad20feb195bd33abeacdc1f2d82c045b9ab2d91'
+      );
+    });
 
-    await page
-      .locator('li')
-      .filter({ hasNotText: 'булка' })
-      .first()
-      .getByRole('button', { name: 'Добавить' })
-      .click();
+    const constructor = page.getByTestId('burger-constructor');
 
-    const orderButton = page.getByRole('button', { name: 'Оформить заказ' });
+    const bunCard = page.getByTestId('ingredient-643d69a5c3f7b9001cfa093c');
+    await bunCard.locator('button', { hasText: 'Добавить' }).click();
+
+    const sauceCard = page.getByTestId('ingredient-643d69a5c3f7b9001cfa0941');
+    await sauceCard.locator('button', { hasText: 'Добавить' }).click();
+
+    const orderButton = page.getByRole('button', {
+      name: 'Оформить заказ'
+    });
+
+    await expect(orderButton).toBeEnabled();
+
     await orderButton.click();
 
-    // Проверка создания заказа и очистки конструктора
-    const orderModalText = page.getByText('109008');
-    await expect(orderModalText).toBeVisible({ timeout: 10000 });
+    const modal = page.locator('#modals');
+
+    await expect(modal.getByText('идентификатор заказа')).toBeVisible({
+      timeout: 30000
+    });
 
     await expect(
-      page.locator('section').filter({ hasText: 'Выберите булки' })
+      modal.getByRole('heading', {
+        name: '109110'
+      })
     ).toBeVisible();
 
-    // Закрытие модального окн
-    const closeButton = page
-      .locator('#modals button, [class*="close"]')
-      .first();
-    await closeButton.click();
-    await expect(orderModalText).not.toBeVisible();
+    await page.locator('#modals button').click();
+
+    await expect(modal.getByText('идентификатор заказа')).toHaveCount(0);
+
+    await expect(constructor.getByText('Выберите булки')).toHaveCount(2);
+
+    await expect(constructor.getByText('Выберите начинку')).toBeVisible();
   });
 });
